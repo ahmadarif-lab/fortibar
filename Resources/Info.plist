@@ -7,9 +7,11 @@
 	<key>CFBundleDisplayName</key>
 	<string>FortiBar</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.ahmadarif.fortibar</string>
+	<string>id.my.bontot.fortibar</string>
 	<key>CFBundleExecutable</key>
 	<string>FortiBar</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -21,6 +23,6 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>MIT. Bundles forticlient-cli (MIT, a3660980/fortivpn-client-cli) to drive FortiClient via FortiTray IPC.</string>
+	<string>MIT.</string>
 </dict>
 </plist>

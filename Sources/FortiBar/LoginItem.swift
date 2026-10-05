@@ -11,6 +11,8 @@ enum LoginItem {
 
     @discardableResult
     static func setEnabled(_ enabled: Bool) -> Error? {
+        // `swift run` has no .app bundle; registering would point at the build folder.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return nil }
         do {
             if enabled {
                 try SMAppService.mainApp.register()

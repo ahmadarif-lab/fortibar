@@ -48,6 +48,7 @@ final class StatusBarController: NSObject {
         button.image = Self.shieldImage(filled: phase == .connected, tint: Self.tint(for: phase))
         button.contentTintColor = nil
         button.toolTip = "FortiBar — \(phase.title)"
+        resizePanelToFit()
 
         if phase == .connecting || phase == .disconnecting {
             startAnimating()
@@ -133,6 +134,12 @@ final class StatusBarController: NSObject {
 
     // MARK: - Panel
 
+    /// Screenshot mode only: show the dropdown without a click.
+    func openForDemo() {
+        open()
+        panel?.makeFirstResponder(nil)
+    }
+
     @objc private func handleClick() {
         if panel != nil {
             close()
@@ -173,6 +180,20 @@ final class StatusBarController: NSObject {
         Task { await model.refresh() }
     }
 
+    /// Content height changes with the state (profile count, OTP row, notices);
+    /// keep the panel tight and anchored to the menu bar.
+    private func resizePanelToFit() {
+        guard let panel, let hosting else { return }
+        DispatchQueue.main.async {
+            let height = hosting.fittingSize.height
+            guard abs(height - panel.frame.height) > 0.5 else { return }
+            var frame = panel.frame
+            frame.origin.y += frame.height - height
+            frame.size.height = height
+            panel.setFrame(frame, display: true)
+        }
+    }
+
     private func makePanel() -> DropdownPanel {
         let panel = DropdownPanel(
             contentRect: NSRect(x: 0, y: 0, width: Theme.panelWidth, height: 360),
@@ -188,7 +209,7 @@ final class StatusBarController: NSObject {
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
 
-        let view = DropdownView(model: model, onClose: { [weak self] in self?.close() })
+        let view = DropdownView(model: model)
         let hosting = NSHostingView(rootView: view)
         hosting.frame = NSRect(x: 0, y: 0, width: Theme.panelWidth, height: 360)
         panel.contentView = hosting
