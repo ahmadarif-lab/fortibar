@@ -131,6 +131,21 @@ struct ProfileEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("General").font(.headline)
             Toggle("Launch FortiBar at login", isOn: $model.launchAtLogin)
+            Toggle("Check for updates automatically", isOn: $model.checkUpdatesAutomatically)
+            HStack {
+                Button("Check for updates") { Task { await model.checkForUpdate(manual: true) } }
+                    .disabled(model.checkingForUpdate)
+                if model.checkingForUpdate { ProgressView().controlSize(.small) }
+                if let release = model.availableUpdate {
+                    Text("Version \(release.version) is available.").font(.callout)
+                    Button("Release notes") { model.openRelease() }.buttonStyle(.link)
+                    Button("Copy brew command") { model.copyUpgradeCommand() }.buttonStyle(.link)
+                }
+            }
+            if let text = model.updateCheckMessage {
+                Text(text).font(.callout).foregroundStyle(.secondary)
+            }
+            Text("FortiBar \(model.versionLabel)").font(.caption).foregroundStyle(.secondary)
         }
     }
 

@@ -86,3 +86,32 @@ final class ValidationTests: XCTestCase {
 func sampleProfile() -> NativeProfile {
     NativeProfile(name: "Test", gateway: "203.0.113.10", peerID: "", username: "jdoe")
 }
+
+final class UpdateCheckerTests: XCTestCase {
+    func testVersionOrdering() throws {
+        let v = { try XCTUnwrap(AppVersion($0)) }
+        XCTAssertLessThan(try v("0.1.0"), try v("0.2.0"))
+        XCTAssertLessThan(try v("0.9.9"), try v("0.10.0"))
+        XCTAssertLessThan(try v("1.0"), try v("1.0.1"))
+        XCTAssertEqual(try v("v1.2"), try v("1.2.0"))
+        XCTAssertEqual(try v("1.2.0-beta.1"), try v("1.2.0"))
+        XCTAssertNil(AppVersion("latest"))
+        XCTAssertNil(AppVersion("1..2"))
+        XCTAssertNil(AppVersion(""))
+    }
+
+    func testParseRelease() throws {
+        let json = #"{"tag_name":"v0.2.0","html_url":"https://github.com/ahmadarif-lab/fortibar/releases/tag/v0.2.0","draft":false,"prerelease":false}"#
+        let release = try UpdateChecker.parse(Data(json.utf8))
+        XCTAssertEqual(release.version, "0.2.0")
+    }
+
+    func testParseRejectsPrereleaseAndForeignURL() {
+        let pre = #"{"tag_name":"v0.2.0","html_url":"https://github.com/x/y","prerelease":true}"#
+        XCTAssertThrowsError(try UpdateChecker.parse(Data(pre.utf8)))
+        let foreign = #"{"tag_name":"v0.2.0","html_url":"https://evil.example/x"}"#
+        XCTAssertThrowsError(try UpdateChecker.parse(Data(foreign.utf8)))
+        let badTag = #"{"tag_name":"nightly","html_url":"https://github.com/x/y"}"#
+        XCTAssertThrowsError(try UpdateChecker.parse(Data(badTag.utf8)))
+    }
+}

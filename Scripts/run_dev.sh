@@ -6,6 +6,7 @@
 #
 #   Scripts/run_dev.sh                       # normal run
 #   FORTIBAR_DEMO=connected Scripts/run_dev.sh   # made-up profiles, nothing real touched
+#   FORTIBAR_VERSION=0.0.1 Scripts/run_dev.sh    # pretend to be an old version to see the update banner
 set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 swift build --product FortiBarHelper >/dev/null   # so "Install helper" finds it next to the app

@@ -63,6 +63,10 @@ Then open **FortiBar** from Applications and follow [First run](#first-run).
 
 ### Updating
 
+FortiBar checks GitHub for a new release at launch and every 12 hours, and shows a notification and a
+banner in the menu when one is out. The banner links to the release notes and copies the upgrade
+command; turn the check off or run it by hand under **Settings → General**.
+
 ```sh
 brew upgrade --cask fortibar
 ```
@@ -97,6 +101,8 @@ FortiBar starts itself at login from the first launch (via `SMAppService`). Turn
 - Notices the tunnel dropping (dead peer) and cleans up its routes so the Mac is never left
   half-configured
 - Notifications on connect/disconnect, and a small activity log in the menu
+- Tells you when a new release is available (the only network request FortiBar makes itself, to
+  `api.github.com`; it sends nothing but a `User-Agent`)
 
 ## Requirements
 

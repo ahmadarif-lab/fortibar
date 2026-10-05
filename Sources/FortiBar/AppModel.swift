@@ -45,6 +45,17 @@ final class AppModel: ObservableObject {
         didSet { LoginItem.setEnabled(launchAtLogin) }
     }
 
+    /// A newer release than the running one, unless the user dismissed it.
+    @Published private(set) var availableUpdate: ReleaseInfo?
+    @Published private(set) var updateCheckMessage: String?
+    @Published private(set) var checkingForUpdate = false
+    @Published var checkUpdatesAutomatically: Bool {
+        didSet {
+            UserDefaults.standard.set(checkUpdatesAutomatically, forKey: Self.autoUpdateKey)
+            if checkUpdatesAutomatically { Task { await checkForUpdate(manual: false) } }
+        }
+    }
+
     // MARK: - Dependencies
 
     private let engine = NativeEngine()
@@ -54,13 +65,21 @@ final class AppModel: ObservableObject {
     private var lastState: VPNStatus.State = .unknown
     private var notifiedAuthorization = false
 
+    private var updateTimer: Timer?
+    private var latestRelease: ReleaseInfo?
+
     private static let activeKey = "activeProfileID"
     private static let selectedKey = "selectedProfileID"
+    private static let autoUpdateKey = "checkUpdatesAutomatically"
+    private static let notifiedUpdateKey = "notifiedUpdateVersion"
+    private static let dismissedUpdateKey = "dismissedUpdateVersion"
+    private static let updateInterval: TimeInterval = 12 * 3600
 
     // MARK: - Init
 
     init() {
         launchAtLogin = LoginItem.isEnabled
+        checkUpdatesAutomatically = UserDefaults.standard.object(forKey: Self.autoUpdateKey) as? Bool ?? true
         profiles = store.items
         let saved = UserDefaults.standard.string(forKey: Self.selectedKey)
         selectedID = profiles.first { $0.id == saved }?.id ?? profiles.first?.id
@@ -96,6 +115,10 @@ final class AppModel: ObservableObject {
         }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
+        }
+        Task { await checkForUpdate(manual: false) }
+        updateTimer = Timer.scheduledTimer(withTimeInterval: Self.updateInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.checkForUpdate(manual: false) }
         }
     }
 
@@ -280,6 +303,73 @@ final class AppModel: ObservableObject {
             } catch {
                 helperMessage = friendly(error)
             }
+        }
+    }
+
+    // MARK: - Updates
+
+    /// The running version, or nil outside a packaged app (e.g. `swift run`).
+    /// `FORTIBAR_VERSION=0.0.1 Scripts/run_dev.sh` fakes one to try the update banner.
+    var currentVersion: String? {
+        ProcessInfo.processInfo.environment["FORTIBAR_VERSION"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    }
+
+    var versionLabel: String { currentVersion.map { "v\($0)" } ?? "dev" }
+
+    /// Asks GitHub for the latest release. Automatic checks stay silent when
+    /// there is nothing new or the network is down; manual ones report back.
+    func checkForUpdate(manual: Bool) async {
+        guard !Demo.isOn, !checkingForUpdate else { return }
+        guard let current = currentVersion else {
+            if manual { updateCheckMessage = "Update checks need the packaged app." }
+            return
+        }
+        guard manual || checkUpdatesAutomatically else { return }
+        checkingForUpdate = true
+        if manual { updateCheckMessage = nil }
+        defer { checkingForUpdate = false }
+        do {
+            latestRelease = try await UpdateChecker.check(current: current)
+            publishUpdate(manual: manual)
+            if manual { updateCheckMessage = latestRelease == nil ? "FortiBar \(current) is up to date." : nil }
+        } catch {
+            if manual { updateCheckMessage = "Could not check for updates: \(friendly(error))" }
+        }
+    }
+
+    func dismissUpdate() {
+        guard let release = latestRelease else { return }
+        UserDefaults.standard.set(release.version, forKey: Self.dismissedUpdateKey)
+        availableUpdate = nil
+    }
+
+    func openRelease() {
+        guard let release = latestRelease else { return }
+        NSWorkspace.shared.open(release.url)
+    }
+
+    func copyUpgradeCommand() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(UpdateChecker.upgradeCommand, forType: .string)
+        updateCheckMessage = "Copied. Run it in Terminal, then reopen FortiBar."
+    }
+
+    /// A manual check shows the release even if it was dismissed before.
+    private func publishUpdate(manual: Bool) {
+        guard let release = latestRelease else {
+            availableUpdate = nil
+            return
+        }
+        let defaults = UserDefaults.standard
+        if manual || defaults.string(forKey: Self.dismissedUpdateKey) != release.version {
+            availableUpdate = release
+        }
+        if defaults.string(forKey: Self.notifiedUpdateKey) != release.version {
+            defaults.set(release.version, forKey: Self.notifiedUpdateKey)
+            log("update available: \(release.version)")
+            notifyAuthorizationIfNeeded()
+            notify(title: "FortiBar update available", body: "Version \(release.version) is out. Open the menu to update.")
         }
     }
 

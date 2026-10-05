@@ -32,7 +32,10 @@ struct DropdownView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Theme.color(for: model.phase))
             VStack(alignment: .leading, spacing: 1) {
-                Text("FortiBar").font(.system(size: 13, weight: .semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text("FortiBar").font(.system(size: 13, weight: .semibold))
+                    Text(model.versionLabel).font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
                 HStack(spacing: 5) {
                     Circle().fill(Theme.color(for: model.phase)).frame(width: 7, height: 7)
                     Text(statusText).font(.system(size: 11)).foregroundStyle(.secondary)
@@ -55,6 +58,7 @@ struct DropdownView: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             profileSection
+            if let release = model.availableUpdate { updateBanner(release) }
             if let message = model.helperStatus.message {
                 notice(message, color: Theme.connecting, symbol: "wrench.and.screwdriver")
             }
@@ -94,6 +98,32 @@ struct DropdownView: View {
                 infoRow("Username", profile.username)
             }
         }
+    }
+
+    private func updateBanner(_ release: ReleaseInfo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill").foregroundStyle(Theme.accent)
+                Text("FortiBar \(release.version) is available").font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Button { model.dismissUpdate() } label: {
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Hide until the next version")
+            }
+            HStack(spacing: 8) {
+                Button("Release notes") { model.openRelease() }
+                Button("Copy brew command") { model.copyUpgradeCommand() }
+            }
+            .buttonStyle(.link)
+            .font(.system(size: 11))
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.accent.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     // MARK: - Actions
