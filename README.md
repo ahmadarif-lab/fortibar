@@ -98,6 +98,8 @@ FortiBar starts itself at login from the first launch (via `SMAppService`). Turn
 - Split tunnelling: only the subnets you list (default `10.0.0.0/8`, `172.16.0.0/12`,
   `192.168.0.0/16`) go through the VPN, and you can pin specific LAN ranges to stay local. Your normal
   internet traffic is untouched.
+- Optional *Route virtual IP locally* (Advanced settings) for people who run a local proxy such as
+  sshuttle on top of the VPN, see Troubleshooting
 - Notices the tunnel dropping (dead peer) and cleans up its routes so the Mac is never left
   half-configured
 - Notifications on connect/disconnect, and a small activity log in the menu
@@ -173,6 +175,7 @@ sudo /Applications/FortiBar.app/Contents/Resources/install-helper.sh uninstall
 | *Authentication failed or timed out* | Check the password, and use a fresh FortiToken code — a code works once, and repeated failures can lock the account on the gateway. |
 | *The gateway did not respond* | Check the gateway address and that UDP 500/4500 is reachable from your network. |
 | *Another strongSwan daemon (charon) is already running* | Stop the other IPsec daemon first; FortiBar runs its own. |
+| Connections time out only when a local proxy (sshuttle, a pf `rdr` rule) is in the path: the SYN leaves but nothing comes back | The tunnel's virtual IP is configured as `inet A --> A`, so its host route points at the `utun` instead of `lo0`, and the proxy's reply to `A` is lost. Turn on *Route virtual IP locally* in the profile's Advanced settings and reconnect (the helper needs to be updated once). It only moves that one host route to `lo0` and removes it on disconnect. |
 | Some subnets don't work | A route may already exist for it; the connection notice lists routes that couldn't be installed. |
 
 Logs: the helper writes to `/var/log/fortibar-helper.log`, and the strongSwan daemon to

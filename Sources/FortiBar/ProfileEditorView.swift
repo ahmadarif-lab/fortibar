@@ -92,6 +92,8 @@ struct ProfileEditorView: View {
                 TextField("Keep on LAN", text: $exceptionsText, prompt: Text("comma separated CIDR"))
                 TextField("IKE proposals", text: $draft.ike)
                 TextField("ESP proposals", text: $draft.esp)
+                Toggle("Route virtual IP locally", isOn: $draft.routeVIPLocally)
+                    .help("Needed when a local proxy such as sshuttle redirects traffic to hosts behind the VPN and connections time out.")
             }
         }
         .formStyle(.grouped)

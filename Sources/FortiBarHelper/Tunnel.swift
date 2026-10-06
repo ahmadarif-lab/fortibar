@@ -68,6 +68,9 @@ extension Helper {
                 throw HelperError("Could not find the tunnel interface for \(vip).")
             }
             warnings = installRoutes(params, interface: interface, remoteHost: sa.remoteHost)
+            if params.routeVIPLocally, let warning = routeVirtualIPLocally(vip, interface: interface) {
+                warnings.append(warning)
+            }
 
             self.vip = vip
             phase = .connected
@@ -230,6 +233,33 @@ extension Helper {
             }
         }
         return warnings
+    }
+
+    /// charon configures the tunnel as `inet A --> A`, so the host route for the virtual IP `A`
+    /// points at the utun instead of lo0 as it does for any other local address. Connections that
+    /// leave with `A` as their source and are redirected to a local listener (sshuttle, pf `rdr`,
+    /// transparent proxies) then never get their reply and time out. Re-point `A` at lo0.
+    ///
+    /// Opt-in and best effort: if anything fails the original route is put back and the caller
+    /// gets a warning, the tunnel stays up. The new route is tracked in `routes`, so a normal
+    /// disconnect and crash recovery remove it.
+    private func routeVirtualIPLocally(_ vip: String, interface: String) -> String? {
+        guard HelperValidation.isIPv4CIDR(vip + "/32") else { return nil }
+        if currentRoute(to: vip).interface == "lo0" { return nil }
+
+        _ = runTool("/sbin/route", ["-n", "delete", "-host", vip])
+        let local = RouteSpec(destination: vip + "/32", gateway: "127.0.0.1", interface: nil)
+        let result = local.add()
+        if result.status == 0 {
+            routes.append(local)
+            persist()
+            log("routed virtual IP \(vip) via lo0")
+            return nil
+        }
+        _ = RouteSpec(destination: vip + "/32", gateway: nil, interface: interface).add()
+        let reason = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        log("route virtual IP \(vip) via lo0 failed: \(reason)")
+        return "Could not route the virtual IP \(vip) via lo0: \(reason)"
     }
 
     // MARK: - Messages

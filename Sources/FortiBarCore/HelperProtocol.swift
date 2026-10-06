@@ -13,7 +13,7 @@ public enum HelperProtocol {
     public static let launchDaemonPlist = "/Library/LaunchDaemons/com.fortibar.helper.plist"
     /// Bump when the protocol or helper behaviour changes; the app reinstalls
     /// the helper when the running version differs.
-    public static let version = 1
+    public static let version = 2
 
     public static let charonCandidates = [
         "/opt/homebrew/opt/strongswan/libexec/ipsec/charon",
@@ -46,6 +46,7 @@ public struct ConnectParams: Codable, Sendable {
     public var esp: String
     public var routes: [String]
     public var lanExceptions: [String]
+    public var routeVIPLocally: Bool
     public var psk: String
     public var password: String
     public var otp: String
@@ -59,9 +60,27 @@ public struct ConnectParams: Codable, Sendable {
         esp = profile.esp
         routes = profile.routes
         lanExceptions = profile.lanExceptions
+        routeVIPLocally = profile.routeVIPLocally
         psk = secrets.psk
         password = secrets.password
         otp = secrets.otp
+    }
+
+    // An app from before `routeVIPLocally` existed doesn't send the key.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        gateway = try c.decode(String.self, forKey: .gateway)
+        peerID = try c.decode(String.self, forKey: .peerID)
+        username = try c.decode(String.self, forKey: .username)
+        ike = try c.decode(String.self, forKey: .ike)
+        esp = try c.decode(String.self, forKey: .esp)
+        routes = try c.decode([String].self, forKey: .routes)
+        lanExceptions = try c.decode([String].self, forKey: .lanExceptions)
+        routeVIPLocally = try c.decodeIfPresent(Bool.self, forKey: .routeVIPLocally) ?? false
+        psk = try c.decode(String.self, forKey: .psk)
+        password = try c.decode(String.self, forKey: .password)
+        otp = try c.decode(String.self, forKey: .otp)
     }
 }
 

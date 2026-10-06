@@ -46,6 +46,9 @@ public struct NativeProfile: Codable, Sendable, Identifiable, Equatable {
     public var lanExceptions: [String]
     public var ike: String
     public var esp: String
+    /// Point the tunnel's virtual IP at `lo0` once connected. Off by default; see
+    /// `Helper.routeVirtualIPLocally`.
+    public var routeVIPLocally: Bool
 
     public init(
         id: String = UUID().uuidString,
@@ -56,7 +59,8 @@ public struct NativeProfile: Codable, Sendable, Identifiable, Equatable {
         routes: [String] = NativeProfile.defaultRoutes,
         lanExceptions: [String] = [],
         ike: String = NativeProfile.defaultIKE,
-        esp: String = NativeProfile.defaultESP
+        esp: String = NativeProfile.defaultESP,
+        routeVIPLocally: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -67,6 +71,22 @@ public struct NativeProfile: Codable, Sendable, Identifiable, Equatable {
         self.lanExceptions = lanExceptions
         self.ike = ike
         self.esp = esp
+        self.routeVIPLocally = routeVIPLocally
+    }
+
+    // Profiles saved by earlier versions have no `routeVIPLocally` key.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        gateway = try c.decode(String.self, forKey: .gateway)
+        peerID = try c.decode(String.self, forKey: .peerID)
+        username = try c.decode(String.self, forKey: .username)
+        routes = try c.decode([String].self, forKey: .routes)
+        lanExceptions = try c.decode([String].self, forKey: .lanExceptions)
+        ike = try c.decode(String.self, forKey: .ike)
+        esp = try c.decode(String.self, forKey: .esp)
+        routeVIPLocally = try c.decodeIfPresent(Bool.self, forKey: .routeVIPLocally) ?? false
     }
 
     /// A new profile with sane FortiGate defaults (same proposals vpn-desk uses).

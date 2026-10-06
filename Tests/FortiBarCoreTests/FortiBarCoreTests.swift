@@ -83,6 +83,51 @@ final class ValidationTests: XCTestCase {
     }
 }
 
+final class RouteVIPLocallyTests: XCTestCase {
+    func testDefaultsToOff() {
+        XCTAssertFalse(sampleProfile().routeVIPLocally)
+        XCTAssertFalse(NativeProfile.fresh().routeVIPLocally)
+    }
+
+    func testProfileFromEarlierVersionStillDecodes() throws {
+        let old = """
+        [{"id":"1","name":"Old","gateway":"203.0.113.10","peerID":"","username":"jdoe",
+          "routes":["10.0.0.0/8"],"lanExceptions":[],"ike":"aes128-sha1-modp1536","esp":"aes128-sha1"}]
+        """
+        let list = try JSONDecoder().decode([NativeProfile].self, from: Data(old.utf8))
+        XCTAssertEqual(list.count, 1)
+        XCTAssertFalse(list[0].routeVIPLocally)
+    }
+
+    func testProfileRoundTripKeepsSetting() throws {
+        var profile = sampleProfile()
+        profile.routeVIPLocally = true
+        let data = try JSONEncoder().encode([profile])
+        let back = try JSONDecoder().decode([NativeProfile].self, from: data)
+        XCTAssertTrue(back[0].routeVIPLocally)
+    }
+
+    func testConnectParamsCarrySetting() throws {
+        var profile = sampleProfile()
+        profile.routeVIPLocally = true
+        let params = ConnectParams(profile: profile, secrets: VPNSecrets(psk: "k", password: "p", otp: "123456"))
+        XCTAssertTrue(params.routeVIPLocally)
+        let back = try JSONDecoder().decode(ConnectParams.self, from: JSONEncoder().encode(params))
+        XCTAssertTrue(back.routeVIPLocally)
+    }
+
+    func testConnectParamsFromEarlierAppStillDecode() throws {
+        var profile = sampleProfile()
+        profile.routeVIPLocally = true
+        let params = ConnectParams(profile: profile, secrets: VPNSecrets(psk: "k", password: "p", otp: "123456"))
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(params)) as! [String: Any]
+        object.removeValue(forKey: "routeVIPLocally")
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let back = try JSONDecoder().decode(ConnectParams.self, from: data)
+        XCTAssertFalse(back.routeVIPLocally)
+    }
+}
+
 func sampleProfile() -> NativeProfile {
     NativeProfile(name: "Test", gateway: "203.0.113.10", peerID: "", username: "jdoe")
 }
