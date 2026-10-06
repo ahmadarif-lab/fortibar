@@ -114,11 +114,20 @@ struct DropdownView: View {
                 .help("Hide until the next version")
             }
             HStack(spacing: 8) {
-                Button("Release notes") { model.openRelease() }
-                Button("Copy brew command") { model.copyUpgradeCommand() }
+                if let step = model.updateProgress {
+                    ProgressView().controlSize(.small)
+                    Text(step).font(.system(size: 11)).foregroundStyle(.secondary)
+                } else {
+                    Button("Install") { model.installUpdate() }
+                    Button("Release notes") { model.openRelease() }
+                }
             }
             .buttonStyle(.link)
             .font(.system(size: 11))
+            if let text = model.updateError ?? model.updateCheckMessage {
+                Text(text).font(.system(size: 10)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)

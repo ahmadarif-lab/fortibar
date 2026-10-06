@@ -83,6 +83,44 @@ final class ValidationTests: XCTestCase {
     }
 }
 
+final class BrewUpgradeTests: XCTestCase {
+    func testSummarizePrefersBrewsErrorLine() {
+        let output = """
+        ==> Upgrading 1 outdated package:
+        ==> Downloading https://example.invalid/FortiBar.dmg
+        Error: Download failed on Cask 'fortibar'
+        Please try again later.
+        """
+        XCTAssertEqual(BrewUpgrade.summarize(output), "Error: Download failed on Cask 'fortibar'")
+    }
+
+    func testSummarizeFallsBackToLastLine() {
+        XCTAssertEqual(BrewUpgrade.summarize("first\n\nlast line  \n\n"), "last line")
+        XCTAssertFalse(BrewUpgrade.summarize("").isEmpty)
+    }
+
+    func testDetectsHomebrewInstallByCaskroomEntry() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let caskroom = root.appendingPathComponent("Caskroom/fortibar")
+        XCTAssertFalse(BrewUpgrade.installedViaHomebrew(caskrooms: [caskroom.path]))
+        try FileManager.default.createDirectory(at: caskroom, withIntermediateDirectories: true)
+        XCTAssertTrue(BrewUpgrade.installedViaHomebrew(caskrooms: [caskroom.path]))
+        XCTAssertTrue(BrewUpgrade.installedViaHomebrew(caskrooms: ["/nonexistent/one", caskroom.path]))
+    }
+
+    func testFindsBrewOnlyWhenExecutable() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let brew = dir.appendingPathComponent("brew")
+        FileManager.default.createFile(atPath: brew.path, contents: Data("#!/bin/sh\n".utf8), attributes: [.posixPermissions: 0o644])
+        XCTAssertNil(BrewUpgrade.brewPath(candidates: [brew.path]))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: brew.path)
+        XCTAssertEqual(BrewUpgrade.brewPath(candidates: ["/nonexistent/brew", brew.path]), brew.path)
+    }
+}
+
 final class RouteVIPLocallyTests: XCTestCase {
     func testDefaultsToOff() {
         XCTAssertFalse(sampleProfile().routeVIPLocally)

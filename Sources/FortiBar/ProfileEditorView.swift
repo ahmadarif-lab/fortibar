@@ -136,15 +136,20 @@ struct ProfileEditorView: View {
             Toggle("Check for updates automatically", isOn: $model.checkUpdatesAutomatically)
             HStack {
                 Button("Check for updates") { Task { await model.checkForUpdate(manual: true) } }
-                    .disabled(model.checkingForUpdate)
+                    .disabled(model.checkingForUpdate || model.isUpdating)
                 if model.checkingForUpdate { ProgressView().controlSize(.small) }
                 if let release = model.availableUpdate {
                     Text("Version \(release.version) is available.").font(.callout)
-                    Button("Release notes") { model.openRelease() }.buttonStyle(.link)
-                    Button("Copy brew command") { model.copyUpgradeCommand() }.buttonStyle(.link)
+                    if let step = model.updateProgress {
+                        ProgressView().controlSize(.small)
+                        Text(step).font(.callout).foregroundStyle(.secondary)
+                    } else {
+                        Button("Install \(release.version)") { model.installUpdate() }
+                        Button("Release notes") { model.openRelease() }.buttonStyle(.link)
+                    }
                 }
             }
-            if let text = model.updateCheckMessage {
+            if let text = model.updateError ?? model.updateCheckMessage {
                 Text(text).font(.callout).foregroundStyle(.secondary)
             }
             Text("FortiBar \(model.versionLabel)").font(.caption).foregroundStyle(.secondary)

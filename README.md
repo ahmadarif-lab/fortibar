@@ -64,8 +64,12 @@ Then open **FortiBar** from Applications and follow [First run](#first-run).
 ### Updating
 
 FortiBar checks GitHub for a new release at launch and every 12 hours, and shows a notification and a
-banner in the menu when one is out. The banner links to the release notes and copies the upgrade
-command; turn the check off or run it by hand under **Settings → General**.
+banner in the menu when one is out. Click **Install** in the banner (or in **Settings → General**) and
+FortiBar runs `brew upgrade` for you, then reopens itself; an active tunnel stays up, because the
+helper owns it. Turn the check off or run it by hand under **Settings → General**.
+
+If FortiBar wasn't installed with Homebrew, **Install** opens the release page instead, where you
+download `FortiBar.dmg`. From a terminal, the same upgrade is:
 
 ```sh
 brew upgrade --cask fortibar

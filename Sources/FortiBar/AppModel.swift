@@ -49,6 +49,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var availableUpdate: ReleaseInfo?
     @Published private(set) var updateCheckMessage: String?
     @Published private(set) var checkingForUpdate = false
+    /// The step an update is on while one runs, nil otherwise.
+    @Published private(set) var updateProgress: String?
+    /// Why the last update attempt failed.
+    @Published private(set) var updateError: String?
     @Published var checkUpdatesAutomatically: Bool {
         didSet {
             UserDefaults.standard.set(checkUpdatesAutomatically, forKey: Self.autoUpdateKey)
@@ -320,7 +324,7 @@ final class AppModel: ObservableObject {
     /// Asks GitHub for the latest release. Automatic checks stay silent when
     /// there is nothing new or the network is down; manual ones report back.
     func checkForUpdate(manual: Bool) async {
-        guard !Demo.isOn, !checkingForUpdate else { return }
+        guard !Demo.isOn, !checkingForUpdate, !isUpdating else { return }
         guard let current = currentVersion else {
             if manual { updateCheckMessage = "Update checks need the packaged app." }
             return
@@ -349,10 +353,71 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.open(release.url)
     }
 
-    func copyUpgradeCommand() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(UpdateChecker.upgradeCommand, forType: .string)
-        updateCheckMessage = "Copied. Run it in Terminal, then reopen FortiBar."
+    var isUpdating: Bool { updateProgress != nil }
+
+    /// Homebrew installs are upgraded in place and relaunched. Any other
+    /// install (a DMG copied by hand) gets the release page instead.
+    func installUpdate() {
+        guard let release = latestRelease, !isUpdating, !Demo.isOn else { return }
+        guard BrewUpgrade.installedViaHomebrew() else {
+            NSWorkspace.shared.open(release.url)
+            updateCheckMessage = "FortiBar wasn't installed with Homebrew. Download FortiBar.dmg from the release page."
+            return
+        }
+        updateError = nil
+        updateCheckMessage = nil
+        Task {
+            defer { updateProgress = nil }
+            do {
+                // `brew upgrade` only refreshes the tap when its last update is
+                // a day old, so it may not know this release yet.
+                updateProgress = "Updating Homebrew…"
+                _ = try await BrewUpgrade.run(["update", "--quiet"])
+                updateProgress = "Installing \(release.version)…"
+                _ = try await BrewUpgrade.run(["upgrade", "--cask", BrewUpgrade.cask])
+            } catch {
+                updateError = friendly(error)
+                log("update failed: \(friendly(error))")
+                return
+            }
+            // brew doesn't quit the app it runs inside of, so this process is
+            // still the old version: confirm the new one is on disk, then swap.
+            guard let installed = Self.installedVersion, let running = currentVersion.flatMap(AppVersion.init),
+                  installed > running
+            else {
+                updateError = "Homebrew didn't install a newer version."
+                return
+            }
+            log("updated to \(installed); relaunching")
+            relaunch()
+        }
+    }
+
+    /// The version now on disk at this bundle's path, which differs from the
+    /// running one once an upgrade has replaced the bundle.
+    private static var installedVersion: AppVersion? {
+        let plist = Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+        return (NSDictionary(contentsOf: plist)?["CFBundleShortVersionString"] as? String).flatMap(AppVersion.init)
+    }
+
+    /// Reopens the app from this bundle's path once this process has exited,
+    /// so the second launch doesn't just activate the old one. A tunnel stays
+    /// up across the restart: the helper owns it and the new app reads its state.
+    private func relaunch() {
+        let reopen = Process()
+        reopen.executableURL = URL(fileURLWithPath: "/bin/sh")
+        reopen.arguments = [
+            "-c",
+            "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$0\"",
+            Bundle.main.bundlePath,
+        ]
+        do {
+            try reopen.run()
+        } catch {
+            updateError = "Updated. Quit and reopen FortiBar to finish."
+            return
+        }
+        NSApp.terminate(nil)
     }
 
     /// A manual check shows the release even if it was dismissed before.

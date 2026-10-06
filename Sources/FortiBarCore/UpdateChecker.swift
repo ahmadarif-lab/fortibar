@@ -42,7 +42,6 @@ public struct ReleaseInfo: Sendable, Equatable {
 /// Looks up the latest GitHub release and compares it with the running version.
 public enum UpdateChecker {
     public static let repository = "ahmadarif-lab/fortibar"
-    public static let upgradeCommand = "brew upgrade --cask fortibar"
 
     static let latestURL = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
 
